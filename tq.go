@@ -17,14 +17,14 @@ type tqItem[K, V any] struct {
 type TimerQueue[K comparable, V any] struct {
 	front *tqItem[K, V]
 	back  *tqItem[K, V]
-	fn    func(K, V)
+	fn    func(K, *V)
 	dur   func() time.Duration
 	m     map[K]*tqItem[K, V]
 	sync.Mutex
 }
 
 // Create new timer queue with items accessible by key of type K and values of type V.
-func NewTimerQueue[K comparable, V any](expire_func func(K, V), duration func() time.Duration) *TimerQueue[K, V] {
+func NewTimerQueue[K comparable, V any](expire_func func(K, *V), duration func() time.Duration) *TimerQueue[K, V] {
 	tq := TimerQueue[K, V]{front: nil, back: nil, fn: expire_func, dur: duration, m: make(map[K]*tqItem[K, V])}
 	return &tq
 }
@@ -151,7 +151,7 @@ func (tq *TimerQueue[K, V]) runTimer() {
 		delete(tq.m, item.key)
 		tq.remove(item)
 		tq.Unlock()
-		tq.fn(item.key, item.value)
+		tq.fn(item.key, &item.value)
 	}
 }
 

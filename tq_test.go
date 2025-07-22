@@ -7,8 +7,8 @@ import (
 )
 
 func TestTq(t *testing.T) {
-	fn := func(k int, v string) {
-		fmt.Printf("fn %d: %s => %s\n", k, v, time.Now().Format(time.RFC1123))
+	fn := func(k int, v *string) {
+		fmt.Printf("fn %d: %s => %s\n", k, *v, time.Now().Format(time.RFC1123))
 	}
 	tq := NewTimerQueue[int, string](fn, func() time.Duration { return time.Duration(3 * time.Second) })
 	tq.CheckConsistency()
@@ -60,8 +60,8 @@ func TestTq2(t *testing.T) {
 			t.Fail()
 		}
 	}
-	fn := func(k int, v string) {
-		fmt.Printf("fn %d: %s => %s\n", k, v, time.Now().Format(time.RFC1123))
+	fn := func(k int, v *string) {
+		fmt.Printf("fn %d: %s => %s\n", k, *v, time.Now().Format(time.RFC1123))
 	}
 	tq := NewTimerQueue[int, string](fn, func() time.Duration { return time.Duration(3 * time.Second) })
 	tq.Push(1, "a")
