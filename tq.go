@@ -32,10 +32,13 @@ func NewTimerQueue[K comparable, V any](expire_func func(K, *V), duration func()
 // returns true if queue was empty
 func (tq *TimerQueue[K, V]) push_back(item *tqItem[K, V]) bool {
 	if nil == tq.front {
+		item.prev = nil
+		item.next = nil
 		tq.front, tq.back = item, item
 		return true
 	} else {
-		item.prev = tq.back // item.next = nil
+		item.prev = tq.back
+		item.next = nil
 		tq.back.next = item
 		tq.back = item
 		return false
@@ -50,12 +53,15 @@ func (tq *TimerQueue[K, V]) remove(item *tqItem[K, V]) {
 	if item.prev == nil { // avoid removal twice
 		return
 	}
-	item.prev.next = item.next
-	if item.next != nil {
-		item.next.prev = item.prev
+	prev := item.prev
+	next := item.next
+	prev.next = next
+	if next != nil {
+		next.prev = prev
 	} else {
-		tq.back = item.prev
+		tq.back = prev
 	}
+	item.prev, item.next = nil, nil
 }
 
 func (tq *TimerQueue[K, V]) pop_front() *tqItem[K, V] {
@@ -69,6 +75,7 @@ func (tq *TimerQueue[K, V]) pop_front() *tqItem[K, V] {
 		tq.front.next.prev = nil
 		tq.front = tq.front.next
 	}
+	tmp.prev, tmp.next = nil, nil
 	return tmp
 }
 
@@ -101,6 +108,7 @@ func (tq *TimerQueue[K, V]) Refresh(k K) {
 }
 
 // Get item by it's key. Returns nil if item not found
+// Note that the access to value is not synchronized.
 func (tq *TimerQueue[K, V]) Get(k K) *V {
 	tq.Lock()
 	defer tq.Unlock()
@@ -157,6 +165,8 @@ func (tq *TimerQueue[K, V]) runTimer() {
 
 // for testing purposes only
 func (tq *TimerQueue[K, V]) CheckConsistency() {
+	tq.Lock()
+	defer tq.Unlock()
 	assert := func(cond bool, msg string) {
 		if !cond {
 			panic(msg)

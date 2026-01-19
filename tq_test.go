@@ -89,3 +89,95 @@ func TestTq2(t *testing.T) {
 	tq.CheckConsistency()
 	time.Sleep(5 * time.Second)
 }
+
+func TestTqRefreshReordersToBack(t *testing.T) {
+	fn := func(k int, v *string) {}
+	tq := NewTimerQueue[int, string](fn, func() time.Duration { return 50 * time.Millisecond })
+
+	tq.CheckConsistency()
+	tq.Push(1, "a")
+	tq.CheckConsistency()
+	tq.Push(2, "b")
+	tq.CheckConsistency()
+	tq.Push(3, "c")
+	tq.CheckConsistency()
+
+	// refresh middle item; should move to back without corrupting list
+	tq.Refresh(2)
+	tq.CheckConsistency()
+
+	// remove all, ensure no panic and list stays valid
+	if !tq.Remove(1) {
+		t.Fatalf("expected remove 1 to succeed")
+	}
+	tq.CheckConsistency()
+	if !tq.Remove(3) {
+		t.Fatalf("expected remove 3 to succeed")
+	}
+	tq.CheckConsistency()
+	if !tq.Remove(2) {
+		t.Fatalf("expected remove 2 to succeed")
+	}
+	tq.CheckConsistency()
+}
+
+func TestTqRemoveNonexistent(t *testing.T) {
+	fn := func(k int, v *string) {}
+	tq := NewTimerQueue[int, string](fn, func() time.Duration { return 10 * time.Millisecond })
+
+	tq.CheckConsistency()
+	if tq.Remove(1) {
+		t.Fatalf("expected remove to fail for missing key")
+	}
+	tq.CheckConsistency()
+
+	tq.Push(1, "x")
+	tq.CheckConsistency()
+	if tq.Remove(2) {
+		t.Fatalf("expected remove to fail for missing key")
+	}
+	tq.CheckConsistency()
+}
+
+func TestTqGetAfterRemove(t *testing.T) {
+	fn := func(k int, v *string) {}
+	tq := NewTimerQueue[int, string](fn, func() time.Duration { return 10 * time.Millisecond })
+
+	tq.Push(1, "x")
+	tq.CheckConsistency()
+	if !tq.Remove(1) {
+		t.Fatalf("expected remove to succeed")
+	}
+	tq.CheckConsistency()
+	if tq.Get(1) != nil {
+		t.Fatalf("expected Get to return nil after remove")
+	}
+	tq.CheckConsistency()
+}
+
+func TestTqExpiresAll(t *testing.T) {
+	ch := make(chan int, 10)
+	fn := func(k int, v *string) { ch <- k }
+	tq := NewTimerQueue[int, string](fn, func() time.Duration { return 20 * time.Millisecond })
+
+	tq.Push(1, "a")
+	tq.CheckConsistency()
+	tq.Push(2, "b")
+	tq.CheckConsistency()
+	tq.Push(3, "c")
+	tq.CheckConsistency()
+
+	// wait for expirations
+	time.Sleep(150 * time.Millisecond)
+	tq.CheckConsistency()
+
+	// ensure all callbacks fired
+	got := make(map[int]bool)
+	close(ch)
+	for k := range ch {
+		got[k] = true
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 expirations, got %d", len(got))
+	}
+}
